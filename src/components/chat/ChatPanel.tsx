@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Send, X } from "lucide-react";
 import { getSocket } from "@/lib/socket-client";
+import UserAvatar from "@/components/common/UserAvatar";
 
 type ReplyLite = {
   _id: string;
@@ -20,19 +21,23 @@ type Msg = {
   text: string;
   createdAt: string;
   replyTo?: ReplyLite | null;
+  senderAvatar?: string | null; // optional from API
 };
 
 export default function ChatPanel({
   activeUserId,
   activeName,
+  activeImage,
   onBackMobile,
 }: {
   activeUserId: string | null;
   activeName: string;
+  activeImage?: string;
   onBackMobile: () => void;
 }) {
   const socket = useMemo(() => getSocket(), []);
   const [meId, setMeId] = useState<string>("");
+  const [myAvatar, setMyAvatar] = useState<string>("");
   const [conversationId, setConversationId] = useState<string>("");
   const [text, setText] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -42,10 +47,12 @@ export default function ChatPanel({
   useEffect(() => {
     fetch("/api/auth/session")
       .then((r) => r.json())
-      .then((s) => setMeId(s?.user?.id || ""));
+      .then((s) => {
+        setMeId(s?.user?.id || "");
+        setMyAvatar(s?.user?.image || "");
+      });
   }, []);
 
-  // Open chat: get convo -> join -> load history -> scroll bottom
   useEffect(() => {
     let cancelled = false;
 
@@ -62,7 +69,6 @@ export default function ChatPanel({
         body: JSON.stringify({ userId: activeUserId }),
       });
       const j1 = await r1.json();
-
       if (!r1.ok) {
         alert(j1.message || "Không mở được cuộc trò chuyện");
         return;
@@ -72,11 +78,8 @@ export default function ChatPanel({
       if (cancelled) return;
 
       setConversationId(cid);
-
-      // join room
       socket.emit("join", { conversationId: cid });
 
-      // load history
       const r2 = await fetch(`/api/messages/list?conversationId=${encodeURIComponent(cid)}`);
       const j2 = await r2.json();
       if (cancelled) return;
@@ -93,21 +96,23 @@ export default function ChatPanel({
     };
   }, [activeUserId, socket]);
 
-  // Realtime message:new
-  useEffect(() => {
-    if (!conversationId) return;
+ useEffect(() => {
+  // ✅ nếu conversationId chưa có thì không subscribe
+  if (!conversationId) return;
 
-    const onNew = (m: any) => {
-      if (String(m.conversationId) !== String(conversationId)) return;
-      setMsgs((p) => [...p, m]);
-      setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
-    };
+  const onNew = (m: any) => {
+    if (String(m.conversationId) !== String(conversationId)) return;
+    setMsgs((p) => [...p, m]);
+    setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+  };
 
-    socket.on("message:new", onNew);
-    return () => {
-      socket.off("message:new", onNew);
-    };
-  }, [socket, conversationId]);
+  socket.on("message:new", onNew);
+
+  // ✅ cleanup đúng chuẩn: return 1 function VOID
+  return () => {
+    socket.off("message:new", onNew);
+  };
+}, [conversationId, socket]);
 
   async function send() {
     const t = text.trim();
@@ -130,7 +135,6 @@ export default function ChatPanel({
       alert(j.message || "Gửi thất bại");
       return;
     }
-
     setReplying(null);
   }
 
@@ -144,30 +148,37 @@ export default function ChatPanel({
 
   return (
     <div className="h-dvh md:h-full w-full min-w-0 flex flex-col bg-white">
-      {/* HEADER sticky */}
-      <div className="sticky top-0 z-20 h-12 border-b bg-white flex items-center gap-2 px-3">
+      {/* HEADER */}
+      <div className="sticky top-0 z-20 h-14 border-b bg-white flex items-center gap-3 px-3">
         <button className="md:hidden" onClick={onBackMobile}>
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div className="font-semibold text-sm truncate">{activeName}</div>
+
+        <UserAvatar src={activeImage} alt={activeName} size={38} />
+        <div className="min-w-0">
+          <div className="font-semibold text-sm truncate">{activeName}</div>
+          <div className="text-xs text-zinc-400">Online</div>
+        </div>
       </div>
 
-      {/* MESSAGES scroll area */}
+      {/* MESSAGES */}
       <div className="flex-1 w-full min-w-0 overflow-y-auto px-3 py-3 space-y-2">
         {msgs.map((m) => {
           const isMe = String(m.senderId) === String(meId);
+          const avatar = isMe ? myAvatar : (m.senderAvatar || activeImage || "");
 
           return (
-            <div key={m._id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+            <div key={m._id} className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}>
+              {!isMe ? <UserAvatar src={avatar} alt="user" size={28} /> : null}
+
               <div
                 role="button"
                 tabIndex={0}
                 onClick={() => setReplying(m)}
-                className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm cursor-pointer select-text ${
+                className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm cursor-pointer select-text ${
                   isMe ? "bg-blue-600 text-white" : "bg-zinc-100 text-zinc-900"
                 }`}
               >
-                {/* Quote */}
                 {m.replyTo ? (
                   <div
                     className={`mb-2 rounded-xl px-2 py-1 text-xs border ${
@@ -179,18 +190,18 @@ export default function ChatPanel({
                     <div className="truncate">{m.replyTo.text || "(...)"}</div>
                   </div>
                 ) : null}
-
                 {m.text}
               </div>
+
+              {isMe ? <UserAvatar src={avatar} alt="me" size={28} /> : null}
             </div>
           );
         })}
         <div ref={endRef} />
       </div>
 
-      {/* INPUT sticky */}
+      {/* INPUT */}
       <div className="sticky bottom-0 z-20 border-t bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {/* Reply bar */}
         {replying ? (
           <div className="mb-2 rounded-xl border bg-zinc-50 px-3 py-2 text-xs flex items-center justify-between gap-2">
             <div className="min-w-0">
