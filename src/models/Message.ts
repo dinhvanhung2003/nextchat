@@ -1,17 +1,28 @@
-import { Schema, model, models, Types } from "mongoose";
+import mongoose, { Schema, models, model } from "mongoose";
 
 const MessageSchema = new Schema(
   {
-    conversationId: { type: Types.ObjectId, ref: "Conversation", required: true },
-    senderId: { type: Types.ObjectId, ref: "User", required: true },
+    conversationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true,
+      index: true,
+    },
+    senderId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
     type: { type: String, enum: ["TEXT", "IMAGE"], default: "TEXT" },
     text: { type: String, default: "" },
     imageUrl: { type: String, default: "" },
-    seenBy: [{ type: Types.ObjectId, ref: "User" }],
+    seenBy: [{ type: Schema.Types.ObjectId, ref: "User" }],
+
+    // ✅ Reply message
+    replyTo: { type: Schema.Types.ObjectId, ref: "Message", default: null },
   },
   { timestamps: true }
 );
-
-MessageSchema.index({ conversationId: 1, createdAt: -1 });
 
 export const Message = models.Message || model("Message", MessageSchema);

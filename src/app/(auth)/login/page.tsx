@@ -52,7 +52,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <Label>Số điện thoại</Label>
             <Input
-              placeholder="0123456789"
+            
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
@@ -62,7 +62,7 @@ export default function LoginPage() {
             <Label>Mật khẩu</Label>
             <Input
               type="password"
-              placeholder="••••••••"
+            
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && submit()}

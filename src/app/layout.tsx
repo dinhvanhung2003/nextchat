@@ -1,12 +1,9 @@
 import "./globals.css";
-import Providers from "./provider";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi">
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+    <html lang="vi" suppressHydrationWarning>
+      <body>{children}</body>
     </html>
   );
 }

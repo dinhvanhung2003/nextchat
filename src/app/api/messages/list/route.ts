@@ -9,23 +9,29 @@ export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
-  const me = (session.user as any).id;
+  const meId = (session.user as any).id;
   const { searchParams } = new URL(req.url);
   const conversationId = searchParams.get("conversationId");
 
-  if (!conversationId) return NextResponse.json({ message: "Missing conversationId" }, { status: 400 });
+  if (!conversationId) {
+    return NextResponse.json({ message: "Missing conversationId" }, { status: 400 });
+  }
 
   await dbConnect();
 
-  // check member
   const convo = await Conversation.findById(conversationId).lean();
   if (!convo) return NextResponse.json({ message: "Conversation not found" }, { status: 404 });
-  if (!convo.members.map(String).includes(String(me)))
+
+  const members = (convo.members || []).map(String);
+  if (!members.includes(String(meId))) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
 
   const msgs = await Message.find({ conversationId })
     .sort({ createdAt: 1 })
     .limit(200)
+    // ✅ Populate replyTo so UI can show quoted text
+    .populate("replyTo", "text senderId createdAt")
     .lean();
 
   return NextResponse.json({ data: msgs });
