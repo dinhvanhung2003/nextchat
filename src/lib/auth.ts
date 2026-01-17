@@ -1,54 +1,72 @@
 import type { NextAuthOptions } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { dbConnect } from "./db";
+import { dbConnect } from "@/lib/db";
 import { User } from "@/models/User";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
+
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: "credentials",
       credentials: {
         phone: { label: "Phone", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const phone = credentials?.phone?.trim();
+        const phone = (credentials?.phone || "").trim();
         const password = credentials?.password || "";
-        if (!phone || !password) return null;
 
         await dbConnect();
-        const user = await User.findOne({ phone }).lean();
-        if (!user) return null;
 
-        const ok = await bcrypt.compare(password, user.passwordHash);
+        // tìm user
+        const u: any = await User.findOne({ phone }).lean();
+        if (!u) return null;
+
+        // check pass (tuỳ bạn lưu field gì: passwordHash hay passwordHashs)
+        const hash = u.passwordHash || u.passwordHashs;
+        if (!hash) return null;
+
+        const ok = await bcrypt.compare(password, hash);
         if (!ok) return null;
 
+        // ✅ TRẢ VỀ USER CÓ id
         return {
-          id: String(user._id),
-          name: user.name,
-          phone: user.phone,
-          avatarUrl: user.avatarUrl || "",
+          id: String(u._id),
+          name: u.name,
+          phone: u.phone,
+          image: u.avatarUrl || u.image || "",
         } as any;
       },
     }),
   ],
+
   callbacks: {
+    // ✅ lưu id vào token
     async jwt({ token, user }) {
       if (user) {
-        token.uid = (user as any).id;
-        token.avatarUrl = (user as any).avatarUrl;
+        token.id = (user as any).id;
         token.phone = (user as any).phone;
+        token.picture = (user as any).image;
       }
       return token;
     },
+
+    // ✅ đẩy id ra session
     async session({ session, token }) {
-      (session.user as any).id = token.uid;
-      (session.user as any).avatarUrl = token.avatarUrl;
-      (session.user as any).phone = token.phone;
+      if (session.user) {
+        (session.user as any).id = token.id;
+        (session.user as any).phone = token.phone;
+        session.user.image = (token.picture as any) || session.user.image;
+      }
       return session;
     },
   },
-  pages: { signIn: "/login" },
+
+  pages: {
+    signIn: "/login",
+  },
+
+  secret: process.env.NEXTAUTH_SECRET,
 };

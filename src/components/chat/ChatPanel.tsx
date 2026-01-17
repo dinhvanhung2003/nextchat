@@ -43,6 +43,26 @@ export default function ChatPanel({
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [replying, setReplying] = useState<Msg | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+const listRef = useRef<HTMLDivElement | null>(null);
+const [autoScroll, setAutoScroll] = useState(true);
+
+const scrollToBottom = (behavior: ScrollBehavior = "auto") => {
+  const el = listRef.current;
+  if (!el) return;
+  el.scrollTo({ top: el.scrollHeight, behavior });
+};
+useEffect(() => {
+  const el = listRef.current;
+  if (!el) return;
+
+  const onScroll = () => {
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setAutoScroll(nearBottom);
+  };
+
+  el.addEventListener("scroll", onScroll, { passive: true });
+  return () => el.removeEventListener("scroll", onScroll);
+}, []);
 
   useEffect(() => {
     fetch("/api/auth/session")
@@ -86,7 +106,7 @@ export default function ChatPanel({
 
       if (r2.ok) {
         setMsgs(j2.data || []);
-        setTimeout(() => endRef.current?.scrollIntoView({ behavior: "auto" }), 0);
+     setTimeout(() => scrollToBottom("auto"), 0);
       }
     }
 
@@ -103,7 +123,10 @@ export default function ChatPanel({
   const onNew = (m: any) => {
     if (String(m.conversationId) !== String(conversationId)) return;
     setMsgs((p) => [...p, m]);
-    setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 0);
+      // chỉ auto-scroll nếu đang ở gần cuối
+  setTimeout(() => {
+    if (autoScroll) scrollToBottom("smooth");
+  }, 0);
   };
 
   socket.on("message:new", onNew);

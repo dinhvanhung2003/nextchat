@@ -26,21 +26,50 @@ export default function FriendDirectory() {
   }, []);
 
   async function sendRequest() {
-    setLoading(true);
+  const p = phone.trim();
+  if (!p) return;
+
+  setLoading(true);
+  try {
+    // 1) tìm user theo số điện thoại -> lấy userId
+    const r1 = await fetch(`/api/users/find-by-phone?phone=${encodeURIComponent(p)}`);
+    const j1 = await r1.json();
+    if (!r1.ok) {
+      alert(j1.message || "Không tìm thấy người dùng");
+      return;
+    }
+
+    const addresseeId = j1.data?.userId;
+    if (!addresseeId) {
+      alert("Không lấy được userId của người này");
+      return;
+    }
+
+    // 2) gửi lời mời kết bạn bằng addresseeId
     const res = await fetch("/api/friends/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ addresseeId }),
     });
+
     const j = await res.json();
-    setLoading(false);
+    if (!res.ok) {
+      alert(j.message || "Gửi lời mời thất bại");
+      return;
+    }
 
-    if (!res.ok) return alert(j.message || "Gửi lời mời thất bại");
+    alert(
+      j.autoAccepted
+        ? "Đã tự động chấp nhận (do người kia đã gửi bạn trước)"
+        : "Đã gửi lời mời kết bạn"
+    );
 
-    alert(j.autoAccepted ? "Đã tự động chấp nhận (do người kia đã gửi bạn trước)" : "Đã gửi lời mời kết bạn");
     setPhone("");
     loadRequests();
+  } finally {
+    setLoading(false);
   }
+}
 
   async function accept(requestId: string) {
     const res = await fetch("/api/friends/accept", {
