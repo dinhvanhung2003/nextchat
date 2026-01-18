@@ -9,15 +9,22 @@ import FriendDirectory from "./FriendDirectory";
 import ChatPanel from "./ChatPanel";
 import ProfileMenu from "./ProfileMenu";
 import { Button } from "@/components/ui/button";
+import { usePushUX } from "@/hooks/usePushUX";
+import IosInstallHint from "../../components/IosInstallHint";
 
 export default function ChatShell() {
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [activeName, setActiveName] = useState<string>("");
-
+  const pushUx = usePushUX();
   const isChatOpen = useMemo(() => !!activeUserId, [activeUserId]);
 
   return (
+
     <div className="h-dvh w-full bg-zinc-50">
+            <IosInstallHint
+        open={pushUx.showIosInstallHint}
+        onClose={pushUx.closeIosInstallHint}
+      />
       <div className="mx-auto h-full max-w-6xl">
         <div className="grid h-full grid-cols-1 md:grid-cols-[72px_360px_1fr] border-x bg-white">
           {/* Left icon bar */}
